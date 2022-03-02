@@ -51,7 +51,7 @@ class Board():
         self.apple = apple(height, width, self.block_size, self.screen, range_of_apple_spawn, self.snake)
         self.new_pos_x = 0
         self.new_pos_y = 0
-        self.index = 96662 ### Why 77000 and not 0?
+        self.index = 77000 #96662 ### Why 77000 and not 0?
         self.index_helper = 0
         self.collision = collision(self.apple, self.snake)
         self.apple.spawn_apple()
@@ -164,7 +164,7 @@ class Board():
                 plot_results(score_arr) 
         print(num_images)
         
-        os.remove(f'D:/ProjPickleDump/train_steps/S_images/state_s_{self.index + num_images}.pickle')
+        os.remove(f'D:/ProjPickleDump/train_steps/S_images/5x5_state_s_{self.index}.pickle')
 
     def draw_sprites(self):
         self.draw_board()
@@ -303,11 +303,11 @@ class Board():
         #
         # # GAN
         if self.index > 0:
-            with open(f"D:/ProjPickleDump/train_steps/Sa_images/state_s_{self.index - 1}.pickle", 'wb') as handle:
+            with open(f"D:/ProjPickleDump/train_steps/Sa_images/5x5_state_s_{self.index - 1}.pickle", 'wb') as handle:
                 future_state = torch.from_numpy(img).unsqueeze(0)
                 pickle.dump(future_state, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        with open(f'D:/ProjPickleDump/train_steps/S_images/state_s_{self.index}.pickle', 'wb') as handle:
+        with open(f'D:/ProjPickleDump/train_steps/S_images/5x5_state_s_{self.index}.pickle', 'wb') as handle:
             pickle.dump((state_action, np_reward), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # RNN

@@ -1,7 +1,10 @@
 import torch.nn.functional as F
 
-from GAN.gan_utils import *
-
+try:
+    from gan_utils import *
+except:
+    from GAN.gan_utils import *
+    
 class reward_model(nn.Module):
     def __init__(self, n_channels):
         super(reward_model, self).__init__()

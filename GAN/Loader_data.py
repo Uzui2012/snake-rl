@@ -35,13 +35,14 @@ class ImageDataset(Dataset):
         self.val = val
 
     def __len__(self):
-        return 133000 #The reason index out of range??
+        return len(self.dataset)-1 #The reason index out of range??
 
 
     def __getitem__(self, index):
         try :
             if not self.val:
-                
+                #print(index)
+                #print(self.dataset[index])
                 path = self.dataset[index]  # Remember that S_images has 1 image more than Sa_images because index ffor Sa is index-1
                 path_output = self.dataset[index].replace("S_images", "Sa_images")
                 #print(str(index) + " Worked\n")
@@ -54,7 +55,8 @@ class ImageDataset(Dataset):
                 # for experimental self.transform(pickled_arr_output.to(torch.float32))
                 return  pickled_arr, pickled_arr_output  # was pickled_arr, pickled_arr_output
         except Exception:
-            print(str(index) + " Fucked\n")
+            
+            print(str(index) + " scuffed\n")
             traceback.print_exc()
             exit(555)
 
@@ -134,7 +136,7 @@ def train_reward_model():
     data_train_loader = DataLoader(data_train, batch_size=64, shuffle=True, num_workers=16)
 
     model = reward_model(5).cuda()
-    model.load_state_dict(torch.load(proj_path + "GAN_models\\reward_predictor.pt"))
+    model.load_state_dict(torch.load(proj_path + "GAN_models\\5x5_reward_predictor.pt"))
     optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
 
     plot = []
@@ -163,7 +165,7 @@ def train_reward_model():
             print(f"loss image {running_loss / (i + 1)}")
 
             optimizer.step()
-    torch.save(model.state_dict(), proj_path + "GAN_models\\reward_predictor.pt")
+    torch.save(model.state_dict(), proj_path + "GAN_models\\5x5_reward_predictor.pt")
     plt.plot(plot)
     plt.show()
 
@@ -210,8 +212,11 @@ def train_gan():
     train_transforms_list = [transforms.ToTensor(),
                              transforms.ToPILImage()]
     train_transforms = transforms.Compose(train_transforms_list)
+    print(len(DeblurDataset(data_path).get_paths().data_train))
     data_train = ImageDataset(DeblurDataset(data_path).get_paths().data_train, transform=train_transforms)
     data_train_loader = DataLoader(data_train, batch_size=32,shuffle=True,num_workers=4) #comeback shuffle=True
+    print("A")
+    print(len(data_train_loader.dataset))
     model = UNet(5, 1).cuda()
     #model.load_state_dict(torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\new_models\\GAN11_new.pt"))
     optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -231,6 +236,7 @@ def train_gan():
     generator_amplifier = 3
     discriminator_deamplifier = 15
     for epoch in range(30):
+        print(epoch)
         model.train()
         running_loss = 0.0
         starting_gan = 0.1
@@ -258,7 +264,8 @@ def train_gan():
             dis_mse_loss.backward()
 
             # print(f"loss image {running_loss / (i + 1)} for alpha {alpha}")
-            print(f"combined Loss : {dis_mse_loss} with starting gan being {starting_gan}")
+            if i % 100 == 0:
+                print(f"combined Loss : {dis_mse_loss} with starting gan being {starting_gan}")
             optimizer.step()
 
             optimizer_discrimnator.zero_grad()
@@ -277,9 +284,9 @@ def train_gan():
         # plt.show()
         if epoch % 2 == 0:
             torch.save(discriminator.state_dict(),
-                       proj_path + f"new_models\\discriminator13_{generator_amplifier}_{discriminator_deamplifier}_new.pt")
+                       proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
             torch.save(model.state_dict(),
-                       proj_path + f"new_models\\GAN13_{generator_amplifier}_{discriminator_deamplifier}_new.pt")
+                       proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
         plt.plot(plot_reward)
         plt.show()
 
@@ -291,26 +298,26 @@ def train_gan():
         plt.show()
         counter+=1
         plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
-        plt.savefig(proj_path + f'images\\{counter}_gan_response', bbox_inches='tight')
+        plt.savefig(proj_path + f'images\\5x5_{counter}_gan_response_1', bbox_inches='tight')
         plt.show()
         counter += 1
         plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
-        plt.savefig(proj_path + f'images\\{counter}_ground_truth',
+        plt.savefig(proj_path + f'images\\5x5_{counter}_ground_truth_1',
                     bbox_inches='tight')
         plt.show()
         counter += 1
         torch.save(discriminator.state_dict(),
-                   proj_path + f"new_models\\discriminator13_{generator_amplifier}_{discriminator_deamplifier}_new.pt")
+                   proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
         torch.save(model.state_dict(),
-                   proj_path + f"new_models\\GAN13_{generator_amplifier}_{discriminator_deamplifier}_new.pt")
+                   proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
         plt.plot(plot)
         plt.show()
         # x*=10
 
 
 def save_plot_and_dump_pickle(counter, input_image,source):
-    plt.savefig(proj_path + f'images\\{counter}_input', bbox_inches='tight')
-    with open(proj_path + f"images\\{counter}_{source}.pickle", 'wb') as handle:
+    plt.savefig(proj_path + f'images\\5x5_{counter}_input', bbox_inches='tight')
+    with open(proj_path + f"images\\5x5_{counter}_{source}.pickle", 'wb') as handle:
         pickle.dump(input_image, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -412,9 +419,9 @@ def experimental_train():
         plt.imshow(fake_imgs[2].detach().cpu().numpy().squeeze(), cmap='gray', vmax=1, vmin=0)
         plt.show()
         torch.save(discriminator.state_dict(),
-                   proj_path + f"GAN_models\\Experimental_dis.pt")
+                   proj_path + f"GAN_models\\5x5_Experimental_dis_1.pt")
         torch.save(model.state_dict(),
-                   proj_path + f"GAN_models\\Experimental_gen.pt")
+                   proj_path + f"GAN_models\\5x5_Experimental_gen_1.pt")
 
 
 def validate_gan():
@@ -444,7 +451,7 @@ def validate_gan():
 
 if __name__ == '__main__':
     bla = 1
-    data_path = "C:\\Users\\killi\\Documents\\Repositories\\snake-rl\\train\\"
+    data_path = "D:\\ProjPickleDump\\train_steps"
     data_path2 = "C:\\Users\\killi\\Documents\\Repositories\\snake-rl\\train_reward"
     # train,val = DeblurDataset(data_path).get_paths()
 

@@ -1,7 +1,9 @@
 import torch.nn.functional as F
 
-from GAN.gan_utils import *
-
+try:
+    from gan_utils import *
+except:
+    from GAN.gan_utils import *
 
 class UNet(nn.Module):
     def __init__(self, n_channels, n_classes, bilinear=True):

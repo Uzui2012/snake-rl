@@ -1,7 +1,6 @@
 import sys
 from matplotlib import pyplot as plt
 from matplotlib.style import context
-
 import util
 sys.path.append("..")
 from DQN.DQN_agent import DQN_agent
@@ -26,7 +25,7 @@ from pygame.locals import (
 
 class IBP(object):
     def __init__(self, dqn_agent, proj_path, environment, cuda_flag=True):
-        self.context = torch.zeros(100) #CONTEXT SEQUENCE IS OF LENGTH 100 :D
+        self.context = torch.zeros(100) #CONTEXT SEQUENCE IS OF LENGTH 100 
         self.cuda_flag = cuda_flag
         if cuda_flag:
             self.context= self.context.cuda()
@@ -52,7 +51,7 @@ class IBP(object):
                                           epsilon_speed=1e-4,
                                           cuda_flag=cuda_flag)
         #Fresh Memory
-        self.memory = LSTMModel()
+        self.memory = LSTMModel(context_size=self.context.shape[0])
         
         #GAN Stuff for much later
         gan_path = proj_path
