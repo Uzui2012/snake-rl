@@ -5,7 +5,7 @@ from DQN.DQN_agent import DQN_agent
 PC_PATH = "C:\\Users\\killi\Documents\\Repositories\\snake-rl\\"
 LAPTOP_PATH = "C:\\Users\\killi\\Repos\\snake-rl\\"
 
-CUDA_FLAG = True
+CUDA_FLAG = False
 
 if __name__ == "__main__":
     try:      
@@ -17,7 +17,7 @@ if __name__ == "__main__":
                               epsilon=1,
                               save_model=False,
                               load_model=False,
-                              path=PC_PATH
+                              path=LAPTOP_PATH
                               +"DQN_trained_model\\10x10_model_with_tail.pt",
                               epsilon_speed=1e-4,
                               cuda_flag=CUDA_FLAG)
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
         ibp = IBP(dqn_agent=dqn_agent,
                   environment=board, 
-                  proj_path=PC_PATH, 
+                  proj_path=LAPTOP_PATH, 
                   cuda_flag=CUDA_FLAG)
 
         num_eps = 1000

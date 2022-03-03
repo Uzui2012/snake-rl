@@ -30,12 +30,13 @@ class IBP(object):
         if cuda_flag:
             self.context= self.context.cuda()
         self.env = environment
-        print(torch.flatten(torch.from_numpy(self.env.get_state())).shape)
+        #print(torch.flatten(torch.from_numpy(self.env.get_state())).shape)
         state_size = torch.from_numpy(self.env.get_state())
         state_size = torch.flatten(state_size).shape[0]
         #Fresh Manager
         self.manager = ManagerModel(state_size=state_size, 
-                                    context_size=self.context.shape[0])
+                                    context_size=self.context.shape[0],
+                                    cuda_flag=cuda_flag)
         #Fresh Controller Agent
         self.controller = ControllerAgent(context_size=self.context.shape[0],
                                           action_number=4,
@@ -51,7 +52,8 @@ class IBP(object):
                                           epsilon_speed=1e-4,
                                           cuda_flag=cuda_flag)
         #Fresh Memory
-        self.memory = LSTMModel(context_size=self.context.shape[0])
+        self.memory = LSTMModel(context_size=self.context.shape[0], 
+                                cuda_flag=cuda_flag)
         
         #GAN Stuff for much later
         gan_path = proj_path

@@ -310,6 +310,7 @@ class DQN_agent():
         # self.memory.append(
         #     (self.previous_state, self.previous_action, self.previous_reward, state, terminal,
         #      reward))
+
     def determine_reward(self, reward):
         # mapping of reward 0 => 10 , 1 => -1 ,  2 => -0.1
 
@@ -317,6 +318,7 @@ class DQN_agent():
         reward_in = torch.argmax(reward).item()
 
         return rewards[reward_in]
+
     def show_some_memory(self):
         for x in self.memory.sample(1000):
             (state, which_action, reward, future_state, terminal, terminal_reward) = x
@@ -327,6 +329,7 @@ class DQN_agent():
                 plt.show()
                 print(f"a{which_action}, r{reward}, is_t{terminal_reward} , t_r{terminal_reward}")
                 break
+            
     def sync_networks(self):
         if self.sync_counter % 10 == 0:
             self.update_target_network()
