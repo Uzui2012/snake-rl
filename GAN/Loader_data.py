@@ -1,6 +1,5 @@
 import pickle
 import numpy as np
-import torchvision
 from PIL.ImageFile import ImageFile
 from torch.nn import BCELoss, CrossEntropyLoss, BCEWithLogitsLoss
 from torch.nn.functional import mse_loss
@@ -224,8 +223,8 @@ def train_gan():
     #discriminator.load_state_dict(
     #    torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\GAN_models\\DISC1235678RIMINATOR3.pt"))
     optimizer_reward = Adam(model.parameters(), lr=3e-4)
-    plot = []
-    plot_reward = []
+    
+    #plot_reward = []
     optimizer_discrimnator = SGD(discriminator.parameters(), lr=0.01, momentum=0.9)
     l1_loss = torch.nn.L1Loss().cuda()
 
@@ -235,84 +234,91 @@ def train_gan():
     #     alpha = x
     generator_amplifier = 3
     discriminator_deamplifier = 15
-    for epoch in range(30):
-        print(epoch)
-        model.train()
-        running_loss = 0.0
-        starting_gan = 0.1
-        for i, img in enumerate(data_train_loader):
-            img_blur, img_sharp = img
-            optimizer.zero_grad()
+    
+    for GAN_num in range(3,10):
+        plot_reward = []
+        plot = []
+        for epoch in range(16):
+            print(epoch)
+            model.train()
+            running_loss = 0.0
+            starting_gan = 0.1
+            for i, img in enumerate(data_train_loader):
+                img_blur, img_sharp = img
+                optimizer.zero_grad()
 
-            img_sharp = img_sharp.float().cuda()
-            img_blur = img_blur.float().cuda()
-            img_deblur = model(img_blur)
+                img_sharp = img_sharp.float().cuda()
+                img_blur = img_blur.float().cuda()
+                img_deblur = model(img_blur)
 
-            # loss_reward = BCEWithLogitsLoss()(reward , reward_actual)
-            loss = l1_loss(img_deblur, img_sharp)
-            generator = discriminator(img_deblur)
-            loss_gan = gan_loss(generator, torch.ones_like(generator))
-            running_loss += loss.item()
+                # loss_reward = BCEWithLogitsLoss()(reward , reward_actual)
+                loss = l1_loss(img_deblur, img_sharp)
+                generator = discriminator(img_deblur)
+                loss_gan = gan_loss(generator, torch.ones_like(generator))
+                running_loss += loss.item()
 
-            plot.append(loss.item())
-            dis_mse_loss = loss*generator_amplifier + loss_gan/discriminator_deamplifier
-            # if dis_mse_loss > 1:
-            #     starting_gan*=100
-            # if dis_mse_loss < 0.1:
-            #     starting_gan*=1.2
+                plot.append(loss.item())
+                dis_mse_loss = loss*generator_amplifier + loss_gan/discriminator_deamplifier
+                # if dis_mse_loss > 1:
+                #     starting_gan*=100
+                # if dis_mse_loss < 0.1:
+                #     starting_gan*=1.2
 
-            dis_mse_loss.backward()
+                dis_mse_loss.backward()
 
-            # print(f"loss image {running_loss / (i + 1)} for alpha {alpha}")
-            if i % 100 == 0:
-                print(f"combined Loss : {dis_mse_loss} with starting gan being {starting_gan}")
-            optimizer.step()
+                # print(f"loss image {running_loss / (i + 1)} for alpha {alpha}")
+                if i % 100 == 0:
+                    print(f"combined Loss : {dis_mse_loss} ") #with starting gan being {starting_gan}")
+                optimizer.step()
 
-            optimizer_discrimnator.zero_grad()
-            disc_true = discriminator(img_sharp)
-            disc_fake = discriminator(img_deblur.detach())
-            disc_true_loss = gan_loss(disc_true, torch.ones_like(disc_true))
-            disc_fake_loss = gan_loss(disc_fake, torch.zeros_like(disc_fake))
+                optimizer_discrimnator.zero_grad()
+                disc_true = discriminator(img_sharp)
+                disc_fake = discriminator(img_deblur.detach())
+                disc_true_loss = gan_loss(disc_true, torch.ones_like(disc_true))
+                disc_fake_loss = gan_loss(disc_fake, torch.zeros_like(disc_fake))
 
-            discriminator_loss = disc_true_loss + disc_fake_loss
-            discriminator_loss.backward()
-            optimizer_discrimnator.step()
-            # if i == len(data_train_loader)-1:
-            #     last_deblurs = img_deblur
-        print(f"finished epoch {epoch}")
-        # plt.plot(plot)
-        # plt.show()
-        if epoch % 2 == 0:
+                discriminator_loss = disc_true_loss + disc_fake_loss
+                discriminator_loss.backward()
+                optimizer_discrimnator.step()
+                # if i == len(data_train_loader)-1:
+                #     last_deblurs = img_deblur
+            print(f"finished epoch {epoch}")
+            # plt.plot(plot)
+            # plt.show()
+            #if epoch % 2 == 0:
+            #    torch.save(discriminator.state_dict(),
+            #            proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
+            #    torch.save(model.state_dict(),
+             #           proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
+            #plt.plot(plot_reward)
+            #plt.show()
+
+            input_image = img_blur[0][0].detach().cpu().numpy().squeeze()
+            #predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
+            #actual_output = img_sharp[0].detach().cpu().numpy().squeeze()
+            #plt.imshow(input_image, cmap='gray', vmin=0, vmax=1)
+            save_plot_and_dump_pickle(counter, input_image,"input")
+            #plt.show()
+            #counter += 1
+            #plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
+            #plt.savefig(proj_path + f'IBP_GAN_images\\5x5_{counter}_gan_response_1', bbox_inches='tight')
+            #plt.show()
+            #counter += 1
+            #plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
+            #plt.savefig(proj_path + f'IBP_GAN_images\\5x5_{counter}_ground_truth_1',
+            #            bbox_inches='tight')
+            #plt.show()
+            #counter += 1
             torch.save(discriminator.state_dict(),
-                       proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
+                    proj_path + f"IBP_GAN_Models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_epoch{epoch}_num{GAN_num}.pt")
             torch.save(model.state_dict(),
-                       proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
-        plt.plot(plot_reward)
-        plt.show()
-
-        input_image = img_blur[0][0].detach().cpu().numpy().squeeze()
-        predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
-        actual_output = img_sharp[0].detach().cpu().numpy().squeeze()
-        plt.imshow(input_image, cmap='gray', vmin=0, vmax=1)
-        save_plot_and_dump_pickle(counter, input_image,"input")
-        plt.show()
-        counter+=1
-        plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
-        plt.savefig(proj_path + f'images\\5x5_{counter}_gan_response_1', bbox_inches='tight')
-        plt.show()
-        counter += 1
-        plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
-        plt.savefig(proj_path + f'images\\5x5_{counter}_ground_truth_1',
-                    bbox_inches='tight')
-        plt.show()
-        counter += 1
-        torch.save(discriminator.state_dict(),
-                   proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
-        torch.save(model.state_dict(),
-                   proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
+                    proj_path + f"IBP_GAN_Models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_epoch{epoch}_num{GAN_num}.pt")
+            #plt.plot(plot)
+            #plt.show()
+            # x*=10
         plt.plot(plot)
+        plt.savefig(proj_path + f'IBP_GAN_images\\5x5_loss_epoch-{epoch}_GAN-{GAN_num}')
         plt.show()
-        # x*=10
 
 
 def save_plot_and_dump_pickle(counter, input_image,source):
@@ -451,7 +457,7 @@ def validate_gan():
 
 if __name__ == '__main__':
     bla = 1
-    data_path = "D:\\ProjPickleDump\\train_steps"
+    data_path = "D:\\ProjPickleDump\\images_5x5_py3-7"
     data_path2 = "C:\\Users\\killi\\Documents\\Repositories\\snake-rl\\train_reward"
     # train,val = DeblurDataset(data_path).get_paths()
 

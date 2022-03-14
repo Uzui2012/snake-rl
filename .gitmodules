@@ -1,0 +1,3 @@
+[submodule "gym-snake"]
+	path = gym-snake
+	url = https://github.com/telmo-correa/gym-snake.git

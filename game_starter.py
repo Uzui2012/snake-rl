@@ -86,7 +86,7 @@ class Board():
     def run(self):
         num_images = 0
         score_arr = []
-        episodes = 2000
+        episodes = 1000
         for i in range(0, episodes):
             score = 0
             print(f"New Episode: {i}")
@@ -164,7 +164,7 @@ class Board():
                 plot_results(score_arr) 
         print(num_images)
         
-        os.remove(f'D:/ProjPickleDump/train_steps/S_images/5x5_state_s_{self.index}.pickle')
+        os.remove(f'D:/ProjPickleDump/images_5x5_py3-7/S_images/5x5_state_s_{self.index}.pickle')
 
     def draw_sprites(self):
         self.draw_board()
@@ -303,11 +303,11 @@ class Board():
         #
         # # GAN
         if self.index > 0:
-            with open(f"D:/ProjPickleDump/train_steps/Sa_images/5x5_state_s_{self.index - 1}.pickle", 'wb') as handle:
+            with open(f"D:/ProjPickleDump/images_5x5_py3-7/Sa_images/5x5_state_s_{self.index - 1}.pickle", 'wb') as handle:
                 future_state = torch.from_numpy(img).unsqueeze(0)
                 pickle.dump(future_state, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        with open(f'D:/ProjPickleDump/train_steps/S_images/5x5_state_s_{self.index}.pickle', 'wb') as handle:
+        with open(f'D:/ProjPickleDump/images_5x5_py3-7/S_images/5x5_state_s_{self.index}.pickle', 'wb') as handle:
             pickle.dump((state_action, np_reward), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # RNN
