@@ -21,3 +21,5 @@ images/
 
 
 IBP_GAN_models/
+IBP_GAN_loss_images/
+IBP_GAN_tests/

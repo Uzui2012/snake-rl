@@ -201,44 +201,45 @@ def balance_files():
 
 
 def train_gan():
-    from torchvision import transforms
-    train_transforms_list = [transforms.ToTensor(),
-                             # transforms.Normalize(mean, std)
-                             ]
-    from torch.utils.data import DataLoader
-    import matplotlib.pyplot as plt
-    counter = 0
-    train_transforms_list = [transforms.ToTensor(),
-                             transforms.ToPILImage()]
-    train_transforms = transforms.Compose(train_transforms_list)
-    print(len(DeblurDataset(data_path).get_paths().data_train))
-    data_train = ImageDataset(DeblurDataset(data_path).get_paths().data_train, transform=train_transforms)
-    data_train_loader = DataLoader(data_train, batch_size=32,shuffle=True,num_workers=4) #comeback shuffle=True
-    print("A")
-    print(len(data_train_loader.dataset))
-    model = UNet(5, 1).cuda()
-    #model.load_state_dict(torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\new_models\\GAN11_new.pt"))
-    optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
-    discriminator = DiscriminatorSmall(2).cuda()
-    #discriminator.load_state_dict(
-    #    torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\GAN_models\\DISC1235678RIMINATOR3.pt"))
-    optimizer_reward = Adam(model.parameters(), lr=3e-4)
-    
-    #plot_reward = []
-    optimizer_discrimnator = SGD(discriminator.parameters(), lr=0.01, momentum=0.9)
-    l1_loss = torch.nn.L1Loss().cuda()
-
-    gan_loss = torch.nn.BCELoss().cuda()
-
-    # while x <= 1000:
-    #     alpha = x
-    generator_amplifier = 3
-    discriminator_deamplifier = 15
-    
-    for GAN_num in range(3,10):
+    for GAN_num in range(10):
+        from torchvision import transforms
+        train_transforms_list = [transforms.ToTensor(),
+                                # transforms.Normalize(mean, std)
+                                ]
+        from torch.utils.data import DataLoader
+        import matplotlib.pyplot as plt
+        counter = 0
+        train_transforms_list = [transforms.ToTensor(),
+                                transforms.ToPILImage()]
+        train_transforms = transforms.Compose(train_transforms_list)
+        print(len(DeblurDataset(data_path).get_paths().data_train))
+        data_train = ImageDataset(DeblurDataset(data_path).get_paths().data_train, transform=train_transforms)
+        data_train_loader = DataLoader(data_train, batch_size=32,shuffle=True,num_workers=4) #comeback shuffle=True
+        print("A")
+        print(len(data_train_loader.dataset))
+        model = UNet(5, 1).cuda()
+        #model.load_state_dict(torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\new_models\\GAN11_new.pt"))
+        optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+        discriminator = DiscriminatorSmall(2).cuda()
+        #discriminator.load_state_dict(
+        #    torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\GAN_models\\DISC1235678RIMINATOR3.pt"))
+        optimizer_reward = Adam(model.parameters(), lr=3e-4)
+        
+        #plot_reward = []
         plot_reward = []
         plot = []
+        optimizer_discrimnator = SGD(discriminator.parameters(), lr=0.01, momentum=0.9)
+        l1_loss = torch.nn.L1Loss().cuda()
+
+        gan_loss = torch.nn.BCELoss().cuda()
+
+        # while x <= 1000:
+        #     alpha = x
+        generator_amplifier = 3
+        discriminator_deamplifier = 15
+        
         for epoch in range(16):
+            counter = 0
             print(epoch)
             model.train()
             running_loss = 0.0
@@ -289,41 +290,43 @@ def train_gan():
             #    torch.save(discriminator.state_dict(),
             #            proj_path + f"new_models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
             #    torch.save(model.state_dict(),
-             #           proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
+            #           proj_path + f"new_models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_new_1.pt")
             #plt.plot(plot_reward)
             #plt.show()
 
             input_image = img_blur[0][0].detach().cpu().numpy().squeeze()
-            #predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
-            #actual_output = img_sharp[0].detach().cpu().numpy().squeeze()
-            #plt.imshow(input_image, cmap='gray', vmin=0, vmax=1)
-            save_plot_and_dump_pickle(counter, input_image,"input")
+            predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
+            actual_output = img_sharp[0].detach().cpu().numpy().squeeze()
+            plt.imshow(input_image, cmap='gray', vmin=0, vmax=1)
+            save_plot_and_dump_pickle(counter, input_image,"input", epoch, GAN_num)
             #plt.show()
-            #counter += 1
-            #plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
-            #plt.savefig(proj_path + f'IBP_GAN_images\\5x5_{counter}_gan_response_1', bbox_inches='tight')
-            #plt.show()
-            #counter += 1
-            #plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
-            #plt.savefig(proj_path + f'IBP_GAN_images\\5x5_{counter}_ground_truth_1',
-            #            bbox_inches='tight')
-            #plt.show()
-            #counter += 1
+            counter += 1
+            plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
+            plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_gan_response_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
+            #.show()
+            counter += 1
+            plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
+            plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_ground_truth_GAN-{GAN_num}_epoch-{epoch}_Unique',
+                            bbox_inches='tight')
+            #plt.show()#predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
+            
             torch.save(discriminator.state_dict(),
-                    proj_path + f"IBP_GAN_Models\\discriminator13_5x5_{generator_amplifier}_{discriminator_deamplifier}_epoch{epoch}_num{GAN_num}.pt")
+                    proj_path + f"IBP_GAN_Models\\discriminator_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
             torch.save(model.state_dict(),
-                    proj_path + f"IBP_GAN_Models\\GAN13_5x5_{generator_amplifier}_{discriminator_deamplifier}_epoch{epoch}_num{GAN_num}.pt")
-            #plt.plot(plot)
+                    proj_path + f"IBP_GAN_Models\\GAN_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
+            plt.clf()
+            plt.plot(plot)
+            plt.savefig(proj_path + f'IBP_GAN_loss_images\\5x5_loss_GAN-{GAN_num}_epoch-{epoch}_Unique')
             #plt.show()
             # x*=10
-        plt.plot(plot)
-        plt.savefig(proj_path + f'IBP_GAN_images\\5x5_loss_epoch-{epoch}_GAN-{GAN_num}')
+            
+        plt.imread(proj_path + f'IBP_GAN_loss_images\\5x5_loss_GAN-{GAN_num}_epoch-{epoch}_Unique')
         plt.show()
 
 
-def save_plot_and_dump_pickle(counter, input_image,source):
-    plt.savefig(proj_path + f'images\\5x5_{counter}_input', bbox_inches='tight')
-    with open(proj_path + f"images\\5x5_{counter}_{source}.pickle", 'wb') as handle:
+def save_plot_and_dump_pickle(counter, input_image, source, epoch, GAN_num):
+    plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_input_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
+    with open(proj_path + f"IBP_GAN_tests\\5x5_{counter}_{source}_GAN-{GAN_num}_epoch-{epoch}_Unique.pickle", 'wb') as handle:
         pickle.dump(input_image, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 

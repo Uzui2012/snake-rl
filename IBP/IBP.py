@@ -57,7 +57,7 @@ class IBP(object):
         
         #GAN Stuff for much later
         gan_path = proj_path
-        gan_path += f"new_models\\GAN13_3_15_new.pt"
+        gan_path += f"IBP_GAN_Models\\GAN13_5x5_3_15_epoch15_num2.pt"
 
         if not cuda_flag:
             self.GAN = torch.load(gan_path, map_location=torch.device('cpu'))
