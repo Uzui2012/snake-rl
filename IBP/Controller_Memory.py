@@ -1,48 +1,56 @@
 from json import load
 import random
 import torch
+import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 import sys
 from torch.nn.functional import mse_loss
-
 from DQN.replay_memory import replay_memory
+from IBP.Memory import LSTMModel
 sys.path.append("..")
 
-class ControllerAgent():
+class Controller_Memory():
     def __init__(self, action_number, frames, context_size, learning_rate, 
                        discount_factor, batch_size, epsilon, save_model,
-                       load_model, path, epsilon_speed, cuda_flag=True):
+                       path, epsilon_speed, load_model=False, cuda_flag=True):
 
         self.cuda_flag = cuda_flag
         self.save_model = save_model
         self.load_model = load_model
         self.epsilon_speed = epsilon_speed
         self.context_size = context_size
-        self.network = ControllerModel(context_size=context_size, 
+        self.controller_network = ControllerModel(context_size=context_size, 
                                        output_size=action_number)
         self.target_network = ControllerModel(context_size=context_size, 
                                               output_size=action_number)
 
+        self.memory_network = LSTMModel(context_size=self.context_size, 
+                                cuda_flag=cuda_flag)
+
         if self.cuda_flag:
-            self.network = ControllerModel(context_size=context_size, 
+            self.controller_network = ControllerModel(context_size=context_size, 
                                            output_size=action_number).cuda()
             self.target_network = ControllerModel(context_size=context_size,
                                             output_size=action_number).cuda()
         else:
-            self.network = ControllerModel(context_size=context_size,
+            self.controller_network = ControllerModel(context_size=context_size,
                                            output_size=action_number)
             self.target_network = ControllerModel(context_size=context_size,
                                                   output_size=action_number)
 
-        #if self.load_model:
-        #  self.network.load_state_dict(torch.load(path, map_location=('cpu')))
+        if self.load_model:
+            self.controller_network.load_state_dict(torch.load(path, map_location=('cpu')))
+
+        self.controller_optimizer_network = optim.Adam(self.controller_network.parameters(), lr=learning_rate)
+        self.memory_optimizer_network = optim.Adam(self.controller_network.parameters(), lr=learning_rate)
 
         self.discount_factor = discount_factor
-        self.target_network.load_state_dict(self.network.state_dict())
+        self.target_network.load_state_dict(self.controller_network.state_dict())
         self.frames = frames
         self.previous_action = None
         self.previous_state = 0
+        self.previous_context = 0
         self.batch_size = batch_size
         self.memory = replay_memory(10000)
         self.sync_counter = 0
@@ -51,11 +59,14 @@ class ControllerAgent():
         self.previous_reward = None
 
     def optimize(self):
+        print(len(self.memory.memory))
         if len(self.memory.memory) > self.batch_size + 1:
+            print("optimising controller and memory")
             with torch.enable_grad():
                 batch = self.memory.sample(self.batch_size)
                 if self.cuda_flag:
                     states = torch.empty((self.batch_size, self.frames, 84, 84), requires_grad=True).cuda()
+                    contexts = torch.empty((self.batch_size, 100), requires_grad=True).cuda()
                     actions = torch.empty((self.batch_size), requires_grad=True).cuda()
                     rewards = torch.empty((self.batch_size), requires_grad=True).cuda()
                     future_states = torch.empty((self.batch_size, self.frames, 84, 84),requires_grad=True).cuda()
@@ -64,6 +75,7 @@ class ControllerAgent():
                                                                                            
                 else:
                     states = torch.empty((self.batch_size, self.frames, 84, 84), requires_grad=True)
+                    contexts = torch.empty((self.batch_size, 100), requires_grad=True)
                     actions = torch.empty((self.batch_size), requires_grad=True)
                     rewards = torch.empty((self.batch_size), requires_grad=True)
                     future_states = torch.empty((self.batch_size, self.frames, 84, 84),requires_grad=True)
@@ -73,28 +85,31 @@ class ControllerAgent():
                 if self.cuda_flag:
                     for i in range(len(batch)):
                         states[i] = batch[i][0]
-                        actions[i] = batch[i][1] 
-                        rewards[i] = batch[i][2] 
-                        future_states[i] = batch[i][3] 
-                        terminals[i] = batch[i][4] 
-                        terminals_reward[i] = batch[i][5] 
+                        contexts[i] = batch[i][1]
+                        actions[i] = batch[i][2] 
+                        rewards[i] = batch[i][3] 
+                        future_states[i] = batch[i][4] 
+                        terminals[i] = batch[i][5] 
+                        terminals_reward[i] = batch[i][6] 
                     
                 else:
                     with torch.no_grad():
                         for i in range(len(batch)):
                             states[i] = batch[i][0]
-                            actions[i] = batch[i][1] 
-                            rewards[i] = batch[i][2] 
-                            future_states[i] = batch[i][3] 
-                            terminals[i] = batch[i][4] 
-                            terminals_reward[i] = batch[i][5] 
+                            contexts[i] = batch[i][1]
+                            actions[i] = batch[i][2] 
+                            rewards[i] = batch[i][3] 
+                            future_states[i] = batch[i][4] 
+                            terminals[i] = batch[i][5] 
+                            terminals_reward[i] = batch[i][6] 
                     
                 if self.cuda_flag:
                     future_states = future_states.cuda()
                 
-                self.network.train()
-                self.controller_network.zero_grad()
-                response = self.network(states)
+                self.controller_network.train()
+                self.controller_optimizer_network.zero_grad()
+                self.memory_optimizer_network.zero_grad()
+                response = self.controller_network(states, contexts, True)
                 loss_input = response
                 loss_target = loss_input.clone()
 
@@ -111,14 +126,22 @@ class ControllerAgent():
                 idx = idx.reshape(2, self.batch_size).cpu().long().numpy()
                 loss_target[idx] = new_values
 
-                loss = mse_loss(input=loss_input, target=loss_target)
-                loss_to_return = loss             
+                loss = mse_loss(input=loss_input, target=loss_target) 
+                print(loss)
                 loss.backward()
-                self.optimizer_network.step()
-                return loss_to_return
+                self.controller_optimizer_network.step()
+                self.memory_optimizer_network.step()
+
+    def update_memory(self, reward, terminal, state):
+        if self.flag:
+            self.memory.append(
+                (self.previous_state, self.previous_context, self.previous_action, self.previous_reward, state, terminal,
+                 reward))
+
+            self.optimize()
 
     def make_action(self, state, context, reward, terminal):
-        self.network.eval()
+        self.controller_network.eval()
         with torch.no_grad():
             state = torch.from_numpy(state.copy()).unsqueeze(0).unsqueeze(0)
             #context is already Tensor
@@ -127,11 +150,11 @@ class ControllerAgent():
             else:
                 state = state.float()
 
-            network_output = self.network(state, context)
+            network_output = self.controller_network(state, context, False)
             values, indices = network_output.max(dim=0)
             randy_random = random.uniform(0, 1)
             if randy_random > self.epsilon:
-                 #ASK LUKASZ ABOUT THIS
+                
                 if self.previous_action != None:
                     forbidden_move = self.forbidden_action()
                     network_output[0][forbidden_move] = -99
@@ -148,17 +171,19 @@ class ControllerAgent():
                     actions.remove(forbidden_move)
                 action = random.choice(actions)
 
-            #if self.flag:
-                #self.update_network(reward, terminal, state, context)
+            #self.update_memory(reward, terminal, state)
+            
             self.flag = True
             self.previous_action = action
             self.previous_state = state.clone()
+            self.previous_context = context.clone()
             self.previous_reward = reward
 
             if terminal:
                 if reward == -1:
                     self.previous_action = None
                     self.previous_state = None
+                    self.previous_context = None
                     self.previous_reward = None
                 self.flag = False
             return action
@@ -187,12 +212,27 @@ class ControllerModel(nn.Module):
         self.linear1 = nn.Linear(7 * 7 * 64 + context_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, output_size)
         
-    def forward(self, state, context):
+    def forward(self, state, context, batch_flag):
         X = F.relu(self.conv1(state))
         X = F.relu(self.conv2(X))
         X = F.relu(self.conv3(X))
         X = X.view(X.size(0), 7 * 7 * 64)
-        X = F.relu(self.linear1(torch.cat((X.squeeze(), context), 0)))
+        
+        context = context.unsqueeze(0)
+        '''print(f"Unsqueezed Context: {context.shape}")
+        print(f"Squeezed Context: {context.squeeze().shape}")
+        print(f"X Shape: {X.shape}")
+        if not batch_flag:
+            print(torch.cat((X.squeeze(), context.squeeze()), 0).shape)
+            X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))
+
+        else:
+            print("AAAAAA")
+            print(X.squeeze().shape)
+            print(context.squeeze().shape)
+            print(torch.cat((X.squeeze(), context.squeeze()), 0).shape)
+            X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))'''
+        X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))
         X = F.relu(self.linear2(X))
         return X
 

@@ -25,7 +25,7 @@ class apple():
         while self.is_apple_on_snake(x, y) or (x == self.x or y == self.y):
             x = random.randint(0, self.width - 1)
             y = random.randint(0, self.width - 1)
-        print("position of apple {} {}".format(self.x, self.y))
+        #print("position of apple {} {}".format(self.x, self.y))
         #self.apple_position = (x, y) # was before the change #for moving apple____
         # self.x = x
         # self.y = y
@@ -33,6 +33,7 @@ class apple():
         return x, y
 
     def move_apple(self, curr_apple_pos, target_pos, crawl_flag=True):
+        #print("moving apple one space")
         cur_app_x, curr_app_y = curr_apple_pos
         dest_app_x, dest_app_y = target_pos
 

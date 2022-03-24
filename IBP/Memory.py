@@ -36,8 +36,6 @@ class LSTMModel(nn.Module):
             seq_tensor = seq_tensor.cuda()
             prev_c = prev_c.cuda()
 
-        c, self.cell_state = self.lstm_cell(seq_tensor.unsqueeze(0), 
-                                            (prev_c.unsqueeze(0),
-                                            self.cell_state))
+        c, self.cell_state = self.lstm_cell(seq_tensor.unsqueeze(0), (prev_c.unsqueeze(0), self.cell_state))
         #print(c.squeeze())
         return c.squeeze() # Return whole sequence (c_i)

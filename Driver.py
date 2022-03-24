@@ -1,14 +1,21 @@
 from IBP.IBP import IBP
 from Board.Board import Board, BOARD_HEIGHT, BOARD_WIDTH
 from DQN.DQN_agent import DQN_agent
-
+from gym_snake.gym_snake.envs.constants import GridType
+from gym_snake.gym_snake.envs.snake_env import SnakeEnv
 PC_PATH = "C:\\Users\\killi\Documents\\Repositories\\snake-rl\\"
 LAPTOP_PATH = "C:\\Users\\killi\\Repos\\snake-rl\\"
 
 CUDA_FLAG = True
 
+class Snake_5x5_DeadApple(SnakeEnv):
+    def __init__(self):
+        super().__init__(grid_size=5, initial_snake_size=2) 
+
 if __name__ == "__main__":
-    try:      
+    try:     
+        gym = Snake_5x5_DeadApple()
+
         dqn_agent = DQN_agent(action_number=4,
                               frames=1, 
                               learning_rate=0.0001,
@@ -24,18 +31,13 @@ if __name__ == "__main__":
 
         board = Board(BOARD_HEIGHT, BOARD_WIDTH, dqn_agent=dqn_agent)
 
-        ibp = IBP(dqn_agent=dqn_agent,
-                  environment=board, 
+        ibp = IBP(environment=board, 
                   proj_path=PC_PATH, 
                   cuda_flag=CUDA_FLAG)
 
         num_eps = 1000
         scores = []
-       
-        for ep in range(num_eps):            
-            
-            score = ibp.run(board)
-            scores.append(score)
+        scores = ibp.run(board, num_eps)
             
         ibp.plot_results(scores)
         pass

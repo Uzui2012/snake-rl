@@ -36,7 +36,7 @@ BOARD_WIDTH = 5
 BOARD_HEIGHT = 5
 
 class Board():
-    def __init__(self, height, width, dqn_agent):
+    def __init__(self, height, width, dqn_agent, apple_movement_flag=False):
         self.clockobject = pygame.time.Clock()
         self.was_apple_last = False
         pygame.init()
@@ -76,7 +76,7 @@ class Board():
         self.previous_gan_action = None
         self.temporal_frame_list = []
         self.past_action = None
-        self.apple_movement_flag = False
+        self.apple_movement_flag = apple_movement_flag
 
     def decide_epsilon_greedy(self):
         if load_tables_from_file[0]:
@@ -392,12 +392,12 @@ def plot_results(rewards):
 
 if __name__ == "__main__":
     try:
-        snake = Board(BOARD_WIDTH, BOARD_HEIGHT)
+        snake = Board(BOARD_WIDTH, BOARD_HEIGHT, apple_movement_flag=True)
         #snake.run()
         while True:
             user_input = int(input())
             pygame.display.set_caption(str(user_input))
-            snake.run_step(user_input, apple_crawl=False)
+            snake.run_step(user_input, apple_crawl=True)
             snake.run_step(22)
     except BaseException as error:
         print('An exception occurred: {}'.format(error))

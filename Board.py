@@ -1,4 +1,7 @@
+from asyncio.windows_events import NULL
 import os
+import sys
+sys.path.append("..")
 import pickle
 import time
 import torch
@@ -28,15 +31,13 @@ from pygame.locals import (
 snake_starting_pos = (1, 3)
 # ( bool (do we want to load) ,  filename )
 load_tables_from_file = (False, "9x9model")
-
 range_of_apple_spawn = (1, 2)
 
 BOARD_WIDTH = 5
 BOARD_HEIGHT = 5
 
-
 class Board():
-    def __init__(self, height, width):
+    def __init__(self, height, width, dqn_agent=NULL, apple_movement_flag=False):
         self.clockobject = pygame.time.Clock()
         self.was_apple_last = False
         pygame.init()
@@ -44,19 +45,23 @@ class Board():
         self.height = height
         self.width = width
         self.screen = pygame.display
-        self.screen.set_mode([self.block_size * self.height, self.block_size * self.width])
+        self.screen.set_mode([self.block_size * self.height,
+                             self.block_size * self.width])
         self.snake = Snake(self.block_size, self.screen, snake_starting_pos)
-
         self.running = True
-        self.apple = apple(height, width, self.block_size, self.screen, range_of_apple_spawn, self.snake)
+        self.apple = apple(height, width, self.block_size, self.screen,
+                            range_of_apple_spawn, self.snake)
         self.new_pos_x = 0
         self.new_pos_y = 0
-        self.index = 77000 #96662 ### Why 77000 and not 0?
+        self.index = 96662 ### Why 77000 and not 0?
         self.index_helper = 0
         self.collision = collision(self.apple, self.snake)
         self.apple.spawn_apple()
         self.tick = 0
-        self.game_manager = games_manager((self.apple.x, self.apple.y), snake_starting_pos, self.height, self.width,
+        self.game_manager = games_manager((self.apple.x, self.apple.y), 
+                                          snake_starting_pos,
+                                          self.height,
+                                          self.width,
                                           self.snake, load_tables_from_file)
         self.current_game = self.game_manager.switch_state_table(self.apple.apple_position, self.snake.snake_head,
                                                                  snake_starting_pos)
@@ -64,10 +69,7 @@ class Board():
         self.games_count = 0
         self.longest_streak = 0
 
-        self.dqn_agent = DQN_agent(action_number=4, frames=1, learning_rate=0.0001, discount_factor=0.99, batch_size=8,
-                                   epsilon=1, save_model=False, load_model=True,
-                                   path="C:\\Users\\killi\\Documents\\Repositories\\snake-rl\\DQN_trained_model\\10x10_model_with_tail.pt",
-                                   epsilon_speed=1e-4)
+        self.dqn_agent = dqn_agent
         self.reward = 0
         self.action = None
         self.speed = 9000
@@ -75,7 +77,7 @@ class Board():
         self.previous_gan_action = None
         self.temporal_frame_list = []
         self.past_action = None
-        self.apple_movement_flag = False
+        self.apple_movement_flag = apple_movement_flag
 
     def decide_epsilon_greedy(self):
         if load_tables_from_file[0]:
@@ -86,7 +88,7 @@ class Board():
     def run(self):
         num_images = 0
         score_arr = []
-        episodes = 2500
+        episodes = 2000
         for i in range(0, episodes):
             score = 0
             print(f"New Episode: {i}")
@@ -164,7 +166,7 @@ class Board():
                 plot_results(score_arr) 
         print(num_images)
         
-        os.remove(f'D:/ProjPickleDump/images_5x5_py3-7/Sa_images/5x5_state_s_{self.index}.pickle')
+        os.remove(f'D:/ProjPickleDump/train_steps/S_images/state_s_{self.index + num_images}.pickle')
 
     def draw_sprites(self):
         self.draw_board()
@@ -174,7 +176,7 @@ class Board():
     def lose_win_scenario(self, reward):
         if reward == -1 or reward == 10:
             if reward == -1:
-                print("Apple score {}".format(self.longest_streak))
+                #print("Apple score {}".format(self.longest_streak))
                 self.longest_streak = 0
                 self.snake.reset_snake()
             if reward == 10:
@@ -289,26 +291,25 @@ class Board():
         action = torch.ones_like(torch.from_numpy(img)).repeat(4, 1, 1) * torch.from_numpy(action) \
             .unsqueeze(1) \
             .unsqueeze(2)
-        noise = torch.randn(1, 84, 84)
+        # noise = torch.randn(1, 84, 84)
         state_action = torch.cat([torch.from_numpy(img).unsqueeze(0), action], dim=0)
-        print(state_action.shape)
-        #state_action = torch.cat([noise.double(), action], dim=0)
-        state = torch.from_numpy(img)
-        if self.index > 0:
-            with open(f"D:\\ProjPickleDump\\images_5x5_py3-7\\train_reward\\future\\state_5x5_s_{self.index - 1}.pickle", 'wb') as handle:
-                pickle.dump(state, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(f"D:\\ProjPickleDump\\images_5x5_py3-7\\train_reward\\now\\state_5x5_s_{self.index}.pickle", 'wb') as handle:
-            pickle.dump((state, np_reward), handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # state_action = torch.cat([noise.double(), action], dim=0)
+        # state = torch.from_numpy(img)
+        # if self.index > 0:
+        #     with open(f"train_reward/future/state_s_{self.index - 1}.pickle", 'wb') as handle:
+        #
+        #         pickle.dump(state, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open(f'train_reward/now/state_s_{self.index}.pickle', 'wb') as handle:
+        #     pickle.dump((state, np_reward), handle, protocol=pickle.HIGHEST_PROTOCOL)
         #
         #
         # # GAN
         if self.index > 0:
-            with open(f"D:/ProjPickleDump/images_5x5_py3-7/Sa_images/5x5_state_s_{self.index - 1}.pickle", 'wb') as handle:
+            with open(f"D:/ProjPickleDump/train_steps/Sa_images/state_s_{self.index - 1}.pickle", 'wb') as handle:
                 future_state = torch.from_numpy(img).unsqueeze(0)
-                print(future_state.shape)
                 pickle.dump(future_state, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        with open(f'D:/ProjPickleDump/images_5x5_py3-7/S_images/5x5_state_s_{self.index}.pickle', 'wb') as handle:
+        with open(f'D:/ProjPickleDump/train_steps/S_images/state_s_{self.index}.pickle', 'wb') as handle:
             pickle.dump((state_action, np_reward), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # RNN
@@ -392,13 +393,14 @@ def plot_results(rewards):
 
 if __name__ == "__main__":
     try:
-        snake = Board(BOARD_WIDTH, BOARD_HEIGHT)
-        snake.run()
+        snake = Board(BOARD_WIDTH, BOARD_HEIGHT, apple_movement_flag=True)
+        #snake.run()
+        while True:
+            user_input = int(input())
+            pygame.display.set_caption(str(user_input))
+            snake.run_step(user_input, apple_crawl=True)
+            snake.run_step(22)
     except BaseException as error:
         print('An exception occurred: {}'.format(error))
     #snake.render()
-    """while True:
-        user_input = int(input())
-        pygame.display.set_caption(str(user_input))
-        snake.run_step(user_input, apple_crawl=False)
-        snake.run_step(22)"""
+    

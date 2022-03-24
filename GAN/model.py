@@ -8,8 +8,8 @@ except:
 class UNet(nn.Module):
     def __init__(self, n_channels, n_classes, bilinear=True):
         super(UNet, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
+        self.n_channels = n_channels #5
+        self.n_classes = n_classes #1
         self.bilinear = bilinear
         self.input_droput = nn.Dropout(0.8)
 
@@ -24,6 +24,8 @@ class UNet(nn.Module):
         self.up3 = Up(256, 64, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, n_classes)
+
+        
 
     def forward(self, x):
         evil_twin_of_x = x

@@ -121,7 +121,7 @@ class RewardPathsDataset(object):
         return self
 
 
-def train_reward_model():
+def train_reward_model(path_to_images):
     from torchvision import transforms
     train_transforms_list = [transforms.ToTensor(),
                              # transforms.Normalize(mean, std)
@@ -131,20 +131,23 @@ def train_reward_model():
     train_transforms_list = [transforms.ToTensor(),
                              transforms.ToPILImage()]
     train_transforms = transforms.Compose(train_transforms_list)
-    data_train = RewardDataset(balance_files(), transform=train_transforms)
-    data_train_loader = DataLoader(data_train, batch_size=64, shuffle=True, num_workers=16)
+    data_train = RewardDataset(balance_files(path_to_images), transform=train_transforms)
+    data_train_loader = DataLoader(data_train, batch_size=64, shuffle=True, num_workers=8)
 
     model = reward_model(5).cuda()
-    model.load_state_dict(torch.load(proj_path + "GAN_models\\5x5_reward_predictor.pt"))
+    #model.load_state_dict(torch.load(proj_path + "GAN_models\\reward_predictor.pt"))
     optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-    plot = []
+    plot_loss = []
+    plot_accuracy = []
 
-    for epoch in range(7):
+    for epoch in range(16):
         model.train()
         running_loss = 0.0
-
+        counter = 0
+        correct = 0
         for i, img in enumerate(data_train_loader):
+            counter+=1
             state, actual_reward = img
             optimizer.zero_grad()
 
@@ -156,21 +159,28 @@ def train_reward_model():
 
             running_loss += loss_reward.item()
 
-            plot.append(loss_reward.item())
-
+            plot_loss.append(loss_reward.item())
+            
             loss_reward.backward()
+            if torch.argmax(models_reward[0]).item() == actual_reward[0].item():
+                correct+=1
             print("predicted reward {} actual reward {}".format(torch.argmax(models_reward[0]).item(),
                                                                 actual_reward[0].item()))
             print(f"loss image {running_loss / (i + 1)}")
-
+            print(f"accuracy {correct/counter * 100}")
+            plot_accuracy.append(correct/counter * 100)
             optimizer.step()
-    torch.save(model.state_dict(), proj_path + "GAN_models\\5x5_reward_predictor.pt")
-    plt.plot(plot)
-    plt.show()
+    torch.save(model.state_dict(), proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Reward_Predictor\\5x5_reward_predictor.pt")
+    plt.clf()
+    plt.plot(plot_loss)
+    plt.savefig(proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Reward_Predictor\\5x5_reward_predictor_loss")
+    plt.clf()
+    plt.plot(plot_accuracy)
+    plt.savefig(proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Reward_Predictor\\5x5_reward_predictor_accuracy")
 
 
-def balance_files():
-    data_path = proj_path + "train_reward"
+def balance_files(path):
+    data_path = path + "\\train_reward"
     counter_1 = 0
     data_path_1 = []
     counter_2 = 0
@@ -193,15 +203,18 @@ def balance_files():
                 elif torch.all(torch.eq(reward, torch.Tensor([0, 0, 1]))):
                     counter_3 += 1
                     data_path_3.append(path_to_file)
+            print(f"{counter_1} {counter_2} {counter_3}")
     print(f"{counter_1} {counter_2} {counter_3}")
     lowest_value = min(len(data_path_1), len(data_path_2), len(data_path_3))
     balanced_list = data_path_1[:lowest_value] + data_path_2[:lowest_value] + data_path_3[:lowest_value]
-
+    data_path_1 = data_path_1[:lowest_value]
+    data_path_2 = data_path_2[:lowest_value]
+    data_path_3 = data_path_3[:lowest_value]
     return data_path_1 + data_path_2 + data_path_3
 
 
 def train_gan():
-    for GAN_num in range(10):
+    for GAN_num in range(1, 10):
         from torchvision import transforms
         train_transforms_list = [transforms.ToTensor(),
                                 # transforms.Normalize(mean, std)
@@ -215,7 +228,6 @@ def train_gan():
         print(len(DeblurDataset(data_path).get_paths().data_train))
         data_train = ImageDataset(DeblurDataset(data_path).get_paths().data_train, transform=train_transforms)
         data_train_loader = DataLoader(data_train, batch_size=32,shuffle=True,num_workers=4) #comeback shuffle=True
-        print("A")
         print(len(data_train_loader.dataset))
         model = UNet(5, 1).cuda()
         #model.load_state_dict(torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\new_models\\GAN11_new.pt"))
@@ -238,33 +250,27 @@ def train_gan():
         generator_amplifier = 3
         discriminator_deamplifier = 15
         
-        for epoch in range(16):
+        for epoch in range(25):
             counter = 0
             print(epoch)
             model.train()
             running_loss = 0.0
             starting_gan = 0.1
             for i, img in enumerate(data_train_loader):
-                img_blur, img_sharp = img
+                state_action, resultant_state = img
                 optimizer.zero_grad()
 
-                img_sharp = img_sharp.float().cuda()
-                img_blur = img_blur.float().cuda()
-                img_deblur = model(img_blur)
+                resultant_state = resultant_state.float().cuda()
+                state_action = state_action.float().cuda()
+                gen_guess = model(state_action)
 
-                # loss_reward = BCEWithLogitsLoss()(reward , reward_actual)
-                loss = l1_loss(img_deblur, img_sharp)
-                generator = discriminator(img_deblur)
+                loss = l1_loss(gen_guess, resultant_state)
+                generator = discriminator(gen_guess)
                 loss_gan = gan_loss(generator, torch.ones_like(generator))
                 running_loss += loss.item()
 
                 plot.append(loss.item())
                 dis_mse_loss = loss*generator_amplifier + loss_gan/discriminator_deamplifier
-                # if dis_mse_loss > 1:
-                #     starting_gan*=100
-                # if dis_mse_loss < 0.1:
-                #     starting_gan*=1.2
-
                 dis_mse_loss.backward()
 
                 # print(f"loss image {running_loss / (i + 1)} for alpha {alpha}")
@@ -273,8 +279,8 @@ def train_gan():
                 optimizer.step()
 
                 optimizer_discrimnator.zero_grad()
-                disc_true = discriminator(img_sharp)
-                disc_fake = discriminator(img_deblur.detach())
+                disc_true = discriminator(resultant_state)
+                disc_fake = discriminator(gen_guess.detach())
                 disc_true_loss = gan_loss(disc_true, torch.ones_like(disc_true))
                 disc_fake_loss = gan_loss(disc_fake, torch.zeros_like(disc_fake))
 
@@ -283,6 +289,7 @@ def train_gan():
                 optimizer_discrimnator.step()
                 # if i == len(data_train_loader)-1:
                 #     last_deblurs = img_deblur
+            
             print(f"finished epoch {epoch}")
             # plt.plot(plot)
             # plt.show()
@@ -294,49 +301,48 @@ def train_gan():
             #plt.plot(plot_reward)
             #plt.show()
 
-            input_image = img_blur[0][0].detach().cpu().numpy().squeeze()
-            predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
-            actual_output = img_sharp[0].detach().cpu().numpy().squeeze()
+            input_image = state_action[0][0].detach().cpu().numpy().squeeze()
+            predicted_output_img = gen_guess[0].detach().cpu().numpy().squeeze()
+            actual_output = resultant_state[0].detach().cpu().numpy().squeeze()
             plt.imshow(input_image, cmap='gray', vmin=0, vmax=1)
             save_plot_and_dump_pickle(counter, input_image,"input", epoch, GAN_num)
             #plt.show()
             counter += 1
             plt.imshow(predicted_output_img, cmap='gray', vmin=0, vmax=1)
-            plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_gan_response_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
+            plt.savefig(proj_path + f'IBP_GAN_Folder_2\\IBP_GAN_tests\\5x5_{counter}_gan_response_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
             #.show()
             counter += 1
             plt.imshow(actual_output, cmap='gray', vmin=0, vmax=1)
-            plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_ground_truth_GAN-{GAN_num}_epoch-{epoch}_Unique',
+            plt.savefig(proj_path + f'IBP_GAN_Folder_2\\IBP_GAN_tests\\5x5_{counter}_ground_truth_GAN-{GAN_num}_epoch-{epoch}_Unique',
                             bbox_inches='tight')
             #plt.show()#predicted_output_img = img_deblur[0].detach().cpu().numpy().squeeze()
             
             torch.save(discriminator.state_dict(),
-                    proj_path + f"IBP_GAN_Models\\discriminator_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
+                    proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Models\\discriminator_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
             torch.save(model.state_dict(),
-                    proj_path + f"IBP_GAN_Models\\GAN_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
+                    proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Models\\GAN_Unique_5x5_{generator_amplifier}_{discriminator_deamplifier}_num{GAN_num}_epoch{epoch}.pt")
             plt.clf()
             plt.plot(plot)
-            plt.savefig(proj_path + f'IBP_GAN_loss_images\\5x5_loss_GAN-{GAN_num}_epoch-{epoch}_Unique')
+            plt.savefig(proj_path + f'IBP_GAN_Folder_2\\IBP_GAN_loss_images\\5x5_loss_GAN-{GAN_num}_epoch-{epoch}_Unique')
             #plt.show()
             # x*=10
             
-        plt.imread(proj_path + f'IBP_GAN_loss_images\\5x5_loss_GAN-{GAN_num}_epoch-{epoch}_Unique')
-        plt.show()
+        
 
 
 def save_plot_and_dump_pickle(counter, input_image, source, epoch, GAN_num):
-    plt.savefig(proj_path + f'IBP_GAN_tests\\5x5_{counter}_input_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
-    with open(proj_path + f"IBP_GAN_tests\\5x5_{counter}_{source}_GAN-{GAN_num}_epoch-{epoch}_Unique.pickle", 'wb') as handle:
+    plt.savefig(proj_path + f'IBP_GAN_Folder_2\\IBP_GAN_tests\\5x5_{counter}_input_GAN-{GAN_num}_epoch-{epoch}_Unique', bbox_inches='tight')
+    with open(proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_tests\\5x5_{counter}_{source}_GAN-{GAN_num}_epoch-{epoch}_Unique.pickle", 'wb') as handle:
         pickle.dump(input_image, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def validate_prepare_data():
+def validate_prepare_data(data_path):
     pickled_arr = pickle.load(
-        open(proj_path + "validate_gan\\state_s_188.pickle", "rb"))
-    # pickled_arr_output = pickle.load(
-    #    open("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\validate_gan\\state_s_1.pickle", "rb"))
+        open(data_path + "\\Sa_images\\5x5_state_s_77017.pickle", "rb"))
+    pickled_arr_output = pickle.load(
+        open(data_path + "\\S_images\\5x5_state_s_77017.pickle", "rb"))
 
-    return (pickled_arr, None)
+    return (pickled_arr, pickled_arr_output)
 
 
 def experimental_train():
@@ -433,18 +439,20 @@ def experimental_train():
                    proj_path + f"GAN_models\\5x5_Experimental_gen_1.pt")
 
 
-def validate_gan():
+def validate_gan(data_path):
     train_transforms_list = [transforms.ToTensor(),
                              transforms.ToPILImage()]
     train_transforms = transforms.Compose(train_transforms_list)
     data_train = ImageDataset(DeblurDataset(data_path).get_paths().data_train, transform=train_transforms)
-    data_train_loader = DataLoader(data_train, batch_size=64, shuffle=False, num_workers=16)
+    data_train_loader = DataLoader(data_train, batch_size=64, shuffle=False, num_workers=8)
 
     model = UNet(5, 1).cuda()
     #    model.load_state_dict(torch.load("C:\\Users\\LukePC\\PycharmProjects\\snake-rl\\GAN_models\\GAN_1.pt"))
     model.eval()
     # for i, img in enumerate(data_train_loader):
-    img_blur, img_sharp = validate_prepare_data()
+    img_blur, img_sharp = validate_prepare_data(data_path)
+    print(img_blur.shape)
+    print(img_blur.unsqueeze(0).float().cuda().shape)
     img_deblur, reward = model(img_blur.unsqueeze(0).float().cuda())
 
     # input_image = img_blur[0][0].detach().cpu().numpy().squeeze()
@@ -461,11 +469,12 @@ def validate_gan():
 if __name__ == '__main__':
     bla = 1
     data_path = "D:\\ProjPickleDump\\images_5x5_py3-7"
-    data_path2 = "C:\\Users\\killi\\Documents\\Repositories\\snake-rl\\train_reward"
+    data_path2 = "D:\\ProjPickleDump\\images_5x5_py3-7\\train_reward"
     # train,val = DeblurDataset(data_path).get_paths()
 
     train_gan()
-    # validate_gan()
+    
+    validate_gan(data_path)
     # balance_files()
-    # train_reward_model()
+    #train_reward_model(data_path)
     # experimental_train()
