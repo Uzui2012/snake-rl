@@ -1,5 +1,6 @@
 from json import load
 import random
+import time
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -25,7 +26,8 @@ class Controller_Memory():
         self.target_network = ControllerModel(context_size=context_size, 
                                               output_size=action_number)
 
-        self.memory_network = LSTMModel(context_size=self.context_size, 
+        print(context_size)
+        self.memory_network = LSTMModel(context_size=context_size, hidden_size=context_size,
                                 cuda_flag=cuda_flag)
 
         if self.cuda_flag:
@@ -57,16 +59,17 @@ class Controller_Memory():
         self.epsilon = epsilon
         self.flag = False
         self.previous_reward = None
+        self.running_loss = []
 
     def optimize(self):
-        print(len(self.memory.memory))
+        #print(len(self.memory.memory))
         if len(self.memory.memory) > self.batch_size + 1:
             print("optimising controller and memory")
             with torch.enable_grad():
                 batch = self.memory.sample(self.batch_size)
                 if self.cuda_flag:
                     states = torch.empty((self.batch_size, self.frames, 84, 84), requires_grad=True).cuda()
-                    contexts = torch.empty((self.batch_size, 100), requires_grad=True).cuda()
+                    contexts = torch.empty((self.batch_size, 3136), requires_grad=True).cuda()
                     actions = torch.empty((self.batch_size), requires_grad=True).cuda()
                     rewards = torch.empty((self.batch_size), requires_grad=True).cuda()
                     future_states = torch.empty((self.batch_size, self.frames, 84, 84),requires_grad=True).cuda()
@@ -75,7 +78,7 @@ class Controller_Memory():
                                                                                            
                 else:
                     states = torch.empty((self.batch_size, self.frames, 84, 84), requires_grad=True)
-                    contexts = torch.empty((self.batch_size, 100), requires_grad=True)
+                    contexts = torch.empty((self.batch_size, 3136), requires_grad=True)
                     actions = torch.empty((self.batch_size), requires_grad=True)
                     rewards = torch.empty((self.batch_size), requires_grad=True)
                     future_states = torch.empty((self.batch_size, self.frames, 84, 84),requires_grad=True)
@@ -109,11 +112,15 @@ class Controller_Memory():
                 self.controller_network.train()
                 self.controller_optimizer_network.zero_grad()
                 self.memory_optimizer_network.zero_grad()
+                
                 response = self.controller_network(states, contexts, True)
                 loss_input = response
                 loss_target = loss_input.clone()
 
-                new_values = rewards + torch.mul(self.target_network(future_states).max(dim=1).values[0] * (1 - terminals) + terminals * terminals_reward,
+                #print(self.target_network(future_states, contexts, True))
+                #print(self.target_network(future_states, contexts, True).max().item() )
+
+                new_values = rewards + torch.mul(self.target_network(future_states, contexts, True).max() * (1 - terminals) + terminals * terminals_reward,
                                                  self.discount_factor)
                 
                 if self.cuda_flag:
@@ -124,13 +131,16 @@ class Controller_Memory():
                 
                 
                 idx = idx.reshape(2, self.batch_size).cpu().long().numpy()
-                loss_target[idx] = new_values
+                loss_target = new_values
 
                 loss = mse_loss(input=loss_input, target=loss_target) 
-                print(loss)
+                print(f"Controller & Memory loss = {loss.item()}")
+                self.running_loss.append(loss.item())
                 loss.backward()
                 self.controller_optimizer_network.step()
                 self.memory_optimizer_network.step()
+
+    
 
     def update_memory(self, reward, terminal, state):
         if self.flag:
@@ -171,7 +181,7 @@ class Controller_Memory():
                     actions.remove(forbidden_move)
                 action = random.choice(actions)
 
-            #self.update_memory(reward, terminal, state)
+            self.update_memory(reward, terminal, state)
             
             self.flag = True
             self.previous_action = action
@@ -213,26 +223,33 @@ class ControllerModel(nn.Module):
         self.linear2 = nn.Linear(hidden_size, output_size)
         
     def forward(self, state, context, batch_flag):
+        #print(f"State: {state.shape}")
         X = F.relu(self.conv1(state))
         X = F.relu(self.conv2(X))
         X = F.relu(self.conv3(X))
         X = X.view(X.size(0), 7 * 7 * 64)
         
         context = context.unsqueeze(0)
-        '''print(f"Unsqueezed Context: {context.shape}")
-        print(f"Squeezed Context: {context.squeeze().shape}")
-        print(f"X Shape: {X.shape}")
+
+        #print(f"Unsqueezed Context: {context.shape}")
+        #print(f"Squeezed Context: {context.squeeze().shape}")
+        #print(f"X Shape: {X.shape}")
+        '''
         if not batch_flag:
             print(torch.cat((X.squeeze(), context.squeeze()), 0).shape)
             X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))
 
         else:
-            print("AAAAAA")
             print(X.squeeze().shape)
             print(context.squeeze().shape)
             print(torch.cat((X.squeeze(), context.squeeze()), 0).shape)
             X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))'''
-        X = F.relu(self.linear1(torch.cat((X.squeeze(), context.squeeze()), 0)))
+
+        #print(X.shape)
+        #print(context.shape)
+        #exit(1)
+
+        X = F.relu(self.linear1(torch.flatten(torch.cat((X.squeeze(), context.squeeze())), 0)))
         X = F.relu(self.linear2(X))
         return X
 

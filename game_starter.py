@@ -1,6 +1,5 @@
 import os
 import pickle
-import time
 import torch
 from scipy import ndimage, misc
 import numpy as np
@@ -291,7 +290,7 @@ class Board():
             .unsqueeze(2)
         noise = torch.randn(1, 84, 84)
         state_action = torch.cat([torch.from_numpy(img).unsqueeze(0), action], dim=0)
-        print(state_action.shape)
+        #print(state_action.shape)
         #state_action = torch.cat([noise.double(), action], dim=0)
         state = torch.from_numpy(img)
         if self.index > 0:
@@ -305,7 +304,7 @@ class Board():
         if self.index > 0:
             with open(f"D:/ProjPickleDump/images_5x5_py3-7/Sa_images/5x5_state_s_{self.index - 1}.pickle", 'wb') as handle:
                 future_state = torch.from_numpy(img).unsqueeze(0)
-                print(future_state.shape)
+                #print(future_state.shape)
                 pickle.dump(future_state, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         with open(f'D:/ProjPickleDump/images_5x5_py3-7/S_images/5x5_state_s_{self.index}.pickle', 'wb') as handle:

@@ -21,7 +21,7 @@ class ManagerModel(nn.Module):
     def forward(self, state, context):
         seq = []
         seq.append(context)
-        seq.append(torch.flatten(torch.from_numpy(state)))
+        seq.append(torch.flatten(state))
 
         if self.cuda_flag:
             seq[1] = seq[1].cuda()

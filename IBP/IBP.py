@@ -18,6 +18,7 @@ from IBP.Controller import ControllerAgent, ControllerModel
 from IBP.Memory import LSTMModel
 from IBP.Controller_Memory import Controller_Memory
 from GAN.model import UNet
+import time
 from pygame.locals import (
     K_UP,
     K_DOWN,
@@ -34,7 +35,8 @@ from pygame.locals import (
 
 class IBP(object):
     def __init__(self, proj_path, environment, cuda_flag=True):
-        self.context = torch.zeros(100) #CONTEXT SEQUENCE IS OF LENGTH 100 
+        self.context = torch.zeros(3136) #CONTEXT SEQUENCE IS OF LENGTH 100 
+        self.proj_path = proj_path
         self.cuda_flag = cuda_flag
         if cuda_flag:
             self.context= self.context.cuda()
@@ -52,7 +54,7 @@ class IBP(object):
                                           frames=1, 
                                           learning_rate=0.0001,
                                           discount_factor=0.99, 
-                                          batch_size=8,
+                                          batch_size=1,
                                           epsilon=1,
                                           save_model=False,
                                           load_model=False,
@@ -78,7 +80,6 @@ class IBP(object):
          #                       cuda_flag=cuda_flag)
         self.GAN = UNet(5, 1).cuda()
         self.reward_predictor = reward_model(5).cuda()
-        #GAN Stuff for much later
         gan_path = proj_path
         gan_path += f"IBP_GAN_Folder_2\\IBP_GAN_models\\GAN_Unique_5x5_3_15_num1_epoch24.pt"
         rew_pred_path = proj_path + f"IBP_GAN_Folder_2\\IBP_GAN_Reward_Predictor\\5x5_reward_predictor.pt"
@@ -112,6 +113,12 @@ class IBP(object):
         plt.close()
 
     def select_route(self, state, context):
+        state = torch.from_numpy(state.copy()).unsqueeze(0).unsqueeze(0)
+        #context is already Tensor
+        if self.cuda_flag:
+            state = state.float().cuda()
+        else:
+            state = state.float()
         route = self.manager(state, context)
         route = route + 0.00001
         #print(route)
@@ -180,21 +187,30 @@ class IBP(object):
         #memory_criterion = nn.MSELoss()
         #memory_optimizer = torch.optim.Adam(self.memory.parameters(), lr=0.001)
         manager_gamma = 0.99
-
-        for ep in range(1000):
+        times = []
+        running_manager_loss = []
+        running_controller_memory_loss = []
+        for ep in range(100):
+            
             num_real = 0
             num_imagined = 0
             n_max_imagined_steps = 4
             score = 0
+            
             real_reward = env.collision.return_reward(env.height, env.width)
+            
             imagined_reward = real_reward
             real_state = env.get_state()
             imagined_state = env.get_state()
+            
+            start1 = time.time()
             action = self.select_action(state=real_state,
                                             context=self.context, 
                                             reward=real_reward)
+            
             flag_first = True
-
+            
+            
             while True:
                 #self.memory.zero_grad()
                 #self.controller.network.zero_grad()
@@ -215,9 +231,8 @@ class IBP(object):
                     num_imagined = 0
                     imagined_state = real_state
                     imagined_reward = real_reward
-                    #print(f"Action: {action}, Reward: {real_reward}")
+                    print(f"Real Action Chosen: {action}, Resultant Reward: {real_reward}")
                     
-                    flag_first = False
                 elif route == 1:
                     action = self.select_action(state=real_state,
                                             context=self.context, 
@@ -231,7 +246,7 @@ class IBP(object):
                     #print(state_action.unsqueeze(0).is_cuda())
                     with torch.no_grad():
                         imagined_state = self.GAN(state_action)
-                        #imagined_reward = self.reward_predictor(imagined_state)
+                        imagined_reward = self.reward_predictor(imagined_state)
                         imagined_state = imagined_state.cpu().detach().numpy()
                         imagined_state = imagined_state[ 0:, :]
                         
@@ -249,7 +264,7 @@ class IBP(object):
                         state_action = state_action.cuda()
                     with torch.no_grad():
                         imagined_state = self.GAN(state_action)
-                        #imagined_reward = self.reward_predictor(imagined_state)
+                        imagined_reward = self.reward_predictor(imagined_state)
                         imagined_state = imagined_state.squeeze().squeeze()
                         imagined_state = imagined_state.cpu().detach().numpy()
                         
@@ -296,37 +311,59 @@ class IBP(object):
                                     prev_c=self.context)
                 self.manager.rewards.append(real_reward)
                 
+
                 if real_reward == 10:
                     score += 1            
 
-                if done_flag and train_manager_flag:
-                    R = 0
-                    manager_loss = []
-                    returns = []
-                    #print(f"manager rewards:  {self.manager.rewards}")
-                    for r in self.manager.rewards[::-1]:
-                        R = r + manager_gamma * R
-                        returns.insert(0, R)
-                    returns = torch.tensor(returns)
-                    returns = (returns - returns.mean()) / (returns.std() + ep)
-                    #print(f"returns:    {len(returns)}")
-                    #print(f"saved log probs:     {len(self.manager.saved_log_probs)}")
-                    for log_prob, R in zip(self.manager.saved_log_probs, returns):
-                        #print(log_prob)
-                        #print(R)
-                        manager_loss.append(-log_prob * R)
-                    
-                    manager_optimizer.zero_grad()
-                    
-                    manager_loss = torch.stack(manager_loss).sum()
-                    print(f"manager_loss =   {manager_loss.item()}")
-                    #print(f"returns:    {returns}")
-                    manager_loss.backward(retain_graph=True)
-                    manager_optimizer.step()
-                    del self.manager.rewards[:]
-                    del self.manager.saved_log_probs[:]
+                
+                if done_flag: # or (num_real==20):
+                    if train_manager_flag:
+                        
+                        R = 0
+                        manager_loss = []
+                        returns = []
+                        #print(f"manager rewards:  {self.manager.rewards}")
+                        for r in self.manager.rewards[::-1]:
+                            R = r + manager_gamma * R
+                            returns.insert(0, R)
+                        returns = torch.tensor(returns)
+                        returns = (returns - returns.mean()) / (returns.std() + ep)
+                        #print(f"returns:    {len(returns)}")
+                        #print(f"saved log probs:     {len(self.manager.saved_log_probs)}")
+                        for log_prob, R in zip(self.manager.saved_log_probs, returns):
+                            #print(log_prob)
+                            #print(R)
+                            manager_loss.append(log_prob * R)
+                        
+                        manager_optimizer.zero_grad()
+                        
+                        manager_loss = torch.stack(manager_loss).sum()
+                        print(f"manager_loss =   {manager_loss.item()}")
+                        running_manager_loss.append(manager_loss.item())
+                        print(f"returns:    {returns}")
+                        manager_loss.backward(retain_graph=True)
+                        manager_optimizer.step()
+                        del self.manager.rewards[:]
+                        del self.manager.saved_log_probs[:]
+                    plt.clf()
+                    plt.plot(running_manager_loss)
+                    plt.savefig(self.proj_path + f"IBP_results\\manager_loss\\manager_loss")
+                    plt.clf()
+                    plt.plot(self.controller_memory.running_loss)
+                    plt.savefig(self.proj_path + f"IBP_results\\controller_memory_loss\\controller_memory_loss")
                     scores.append(score)
+                    end = time.time()
+                    times.append(end - start1)
+                    print(f"Time taken to take entire episode: {end - start1}")
                     break
+
+        plt.clf()
+        plt.plot(running_manager_loss)
+        plt.savefig(self.proj_path + f"IBP_results\\manager_loss\\manager_loss")
+        plt.clf()
+        plt.plot(self.controller_memory.running_loss)
+        plt.savefig(self.proj_path + f"IBP_results\\controller_memory_loss\\controller_memory_loss")
+        return scores
                     
             
 
